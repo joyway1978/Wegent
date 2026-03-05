@@ -36,7 +36,15 @@ test.describe('Chat Flow', () => {
     // Get all messages
     const messages = await chatPage.getMessages()
 
-    // Assert: messages.length >= 2 (user message + AI response)
+    // Assert: at least 2 messages (user message + AI response)
     expect(messages.length).toBeGreaterThanOrEqual(2)
+
+    // Verify user message was sent
+    expect(messages.some(m => m.includes('Hello, this is a test message'))).toBe(true)
+
+    // Verify AI response exists (non-empty)
+    expect(messages.some(m => m.length > 0 && !m.includes('Hello, this is a test message'))).toBe(
+      true
+    )
   })
 })
