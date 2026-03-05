@@ -1,6 +1,28 @@
 import { defineConfig, devices } from '@playwright/test'
+import * as path from 'path'
 
-const BASE_URL = process.env.TEST_BASE_URL || 'https://wegent.intra.weibo.com'
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000'
+
+// Determine auth file path
+// 1. Use PLAYWRIGHT_AUTH_FILE if set (from run-tests.sh)
+// 2. Fall back to TEST_BASE_URL to generate filename
+// 3. Default to localhost
+function getAuthFilePath(): string {
+  if (process.env.PLAYWRIGHT_AUTH_FILE) {
+    return process.env.PLAYWRIGHT_AUTH_FILE
+  }
+
+  // Extract domain from URL
+  const url = process.env.TEST_BASE_URL || 'http://localhost:3000'
+  const domain = url
+    .replace(/^https?:\/\//, '')
+    .replace(/[:\/].*$/, '')
+    .replace(/[^a-zA-Z0-9.-]/g, '_') || 'localhost'
+
+  return path.join(__dirname, '.auth', `user_${domain}.json`)
+}
+
+const authFile = getAuthFilePath()
 
 export default defineConfig({
   testDir: './specs',
@@ -16,8 +38,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
 
-    // Use saved authentication state
-    storageState: './.auth/user.json',
+    // Use saved authentication state (domain-specific)
+    storageState: authFile,
   },
 
   // Timeout settings

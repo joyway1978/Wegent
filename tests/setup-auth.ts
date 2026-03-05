@@ -11,8 +11,24 @@ import { chromium } from '@playwright/test'
 import * as path from 'path'
 import * as fs from 'fs'
 
-const BASE_URL = process.env.TEST_BASE_URL || 'https://wegent.intra.weibo.com'
-const AUTH_FILE = path.join(__dirname, '.auth', 'user.json')
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000'
+
+// Determine auth file path from environment or generate from URL
+function getAuthFilePath(): string {
+  if (process.env.AUTH_FILE) {
+    return process.env.AUTH_FILE
+  }
+
+  // Extract domain from URL
+  const domain = BASE_URL
+    .replace(/^https?:\/\//, '')
+    .replace(/[:\/].*$/, '')
+    .replace(/[^a-zA-Z0-9.-]/g, '_') || 'localhost'
+
+  return path.join(__dirname, '.auth', `user_${domain}.json`)
+}
+
+const AUTH_FILE = getAuthFilePath()
 
 async function setupAuth() {
   console.log('Starting authentication setup...')

@@ -72,24 +72,40 @@ test.describe('Chat Flow', () => {
     const messagesContainer = page.locator('.messages-container').first()
     await expect(messagesContainer).toBeVisible({ timeout: 30000 })
 
-    // Wait for AI response - look for Bot icon in the messages
-    // AI messages have lucide-bot SVG icon
+    // Wait for AI message to appear (may take time for API response)
     const aiMessage = messagesContainer.locator('> div').filter({
       has: page.locator('svg.lucide-bot'),
     }).last()
-
-    // Wait for AI message to appear (may take time for API response)
     await expect(aiMessage).toBeVisible({ timeout: 90000 })
 
-    // Verify AI message has some content (not empty)
-    // Wait for the streaming to complete - check for actual text content
-    // The content is inside the message bubble, look for paragraphs or text
-    await page.waitForTimeout(5000) // Give some time for streaming
+    // Wait for streaming to complete
+    await page.waitForTimeout(5000)
 
+    // Structured validation: Verify message format and order
+    const allMessages = await messagesContainer.locator('> div').all()
+
+    // 1. Verify at least 2 messages (user + AI)
+    expect(allMessages.length).toBeGreaterThanOrEqual(2)
+
+    // 2. Verify user message exists and contains our test message
+    const userMessage = allMessages[allMessages.length - 2]
+    const userMessageText = await userMessage.textContent()
+    expect(userMessageText).toContain(testMessage)
+
+    // 3. Verify last message is AI message (has Bot icon)
+    const lastMessage = allMessages[allMessages.length - 1]
+    const hasBotIcon = await lastMessage.locator('svg.lucide-bot').isVisible()
+    expect(hasBotIcon).toBe(true)
+
+    // 4. Verify AI message has meaningful content
     const aiMessageText = await aiMessage.textContent()
     expect(aiMessageText).toBeTruthy()
-    expect(aiMessageText!.length).toBeGreaterThan(10) // Should have meaningful content
+    expect(aiMessageText!.length).toBeGreaterThan(10)
+
+    // 5. Verify AI response is not just repeating the question
+    expect(aiMessageText).not.toBe(testMessage)
 
     console.log('AI Response received:', aiMessageText?.substring(0, 200) + '...')
+    console.log(`Total messages: ${allMessages.length}, Validation passed ✓`)
   })
 })

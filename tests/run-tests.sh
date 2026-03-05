@@ -6,8 +6,19 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AUTH_FILE="$SCRIPT_DIR/.auth/user.json"
+AUTH_DIR="$SCRIPT_DIR/.auth"
 NODE_MODULES="$SCRIPT_DIR/node_modules"
+
+# Get auth file path based on URL domain
+get_auth_file() {
+    local url="$1"
+    # Extract domain from URL (remove protocol and port)
+    local domain=$(echo "$url" | sed -E 's|https?://||' | sed -E 's|[:/].*||' | sed -E 's|[^a-zA-Z0-9.-]|_|g')
+    if [ -z "$domain" ] || [ "$domain" = "localhost" ]; then
+        domain="localhost"
+    fi
+    echo "$AUTH_DIR/user_${domain}.json"
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -58,20 +69,27 @@ install_dependencies() {
     print_success "Dependencies installed successfully!"
 }
 
-# Check if auth state exists and is valid
+# Check if auth state exists and is valid for a specific URL
 check_auth() {
-    if [ ! -f "$AUTH_FILE" ]; then
+    local url="$1"
+    local auth_file=$(get_auth_file "$url")
+
+    if [ ! -f "$auth_file" ]; then
         return 1
     fi
 
     # Check if file is not empty and has valid JSON
-    if [ ! -s "$AUTH_FILE" ]; then
+    if [ ! -s "$auth_file" ]; then
         return 1
     fi
 
     # Basic check for auth_token in the file
-    if grep -q "auth_token" "$AUTH_FILE" 2>/dev/null; then
-        return 0
+    if grep -q "auth_token" "$auth_file" 2>/dev/null; then
+        # Verify the auth file contains cookies for this domain
+        local domain=$(echo "$url" | sed -E 's|https?://||' | sed -E 's|[:/].*||')
+        if grep -q "$domain" "$auth_file" 2>/dev/null; then
+            return 0
+        fi
     fi
 
     return 1
@@ -79,14 +97,20 @@ check_auth() {
 
 # Run authentication setup
 setup_auth() {
+    local url="$1"
+    local auth_file=$(get_auth_file "$url")
+
     print_info "Starting authentication setup..."
+    print_info "Target: $url"
+    print_info "Auth file: $auth_file"
     print_info "A browser will open. Please scan the QR code to login."
     echo ""
 
     cd "$SCRIPT_DIR"
-    npx ts-node setup-auth.ts
+    # Pass auth file path to setup script
+    TEST_BASE_URL="$url" AUTH_FILE="$auth_file" npx ts-node setup-auth.ts
 
-    if check_auth; then
+    if check_auth "$url"; then
         print_success "Authentication setup completed!"
     else
         print_error "Authentication setup failed. Please try again."
@@ -97,8 +121,20 @@ setup_auth() {
 # Run tests
 run_tests() {
     local mode=$1
+    local test_url=$2
+    local auth_file=$(get_auth_file "$test_url")
 
     cd "$SCRIPT_DIR"
+
+    # Export TEST_BASE_URL if provided
+    if [ -n "$test_url" ]; then
+        export TEST_BASE_URL="$test_url"
+        print_info "Testing URL: $test_url"
+    fi
+
+    # Export AUTH_FILE for playwright to use
+    export PLAYWRIGHT_AUTH_FILE="$auth_file"
+    print_info "Using auth state: $auth_file"
 
     case $mode in
         "headed")
@@ -123,7 +159,7 @@ run_tests() {
 # Show usage
 show_usage() {
     echo ""
-    echo "Usage: $0 [OPTIONS]"
+    echo "Usage: $0 [OPTIONS] [URL]"
     echo ""
     echo "Options:"
     echo "  -h, --headed     Run tests with browser UI visible"
@@ -133,10 +169,19 @@ show_usage() {
     echo "  -i, --install    Force reinstall dependencies"
     echo "  --help           Show this help message"
     echo ""
+    echo "Arguments:"
+    echo "  URL              Target URL to test (default: http://localhost:3000)"
+    echo ""
+    echo "Environment Variables:"
+    echo "  TEST_BASE_URL    Alternative way to set target URL"
+    echo ""
     echo "Examples:"
-    echo "  $0               # Run tests in headless mode"
-    echo "  $0 -h            # Run tests with browser visible"
-    echo "  $0 -a            # Re-authenticate and run tests"
+    echo "  $0                                 # Run tests against localhost:3000"
+    echo "  $0 -h                              # Run with browser visible"
+    echo "  $0 http://localhost:3002           # Test specific URL"
+    echo "  $0 -h http://localhost:3002        # Test URL with browser visible"
+    echo "  $0 -a                              # Re-authenticate and run tests"
+    echo "  TEST_BASE_URL=http://localhost:3001 $0"
     echo ""
 }
 
@@ -145,6 +190,7 @@ main() {
     local mode="headless"
     local force_auth=false
     local force_install=false
+    local test_url="${TEST_BASE_URL:-http://localhost:3000}"
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -173,6 +219,10 @@ main() {
                 show_usage
                 exit 0
                 ;;
+            http://*|https://*)
+                test_url="$1"
+                shift
+                ;;
             *)
                 print_error "Unknown option: $1"
                 show_usage
@@ -186,6 +236,8 @@ main() {
     echo "   Wegent Integration Tests Runner"
     echo "=========================================="
     echo ""
+    print_info "Target URL: $test_url"
+    echo ""
 
     # Step 1: Check and install dependencies
     if [ "$force_install" = true ] || ! check_dependencies; then
@@ -198,14 +250,17 @@ main() {
     echo ""
 
     # Step 2: Check and setup authentication
+    local auth_file=$(get_auth_file "$test_url")
+    print_info "Using auth file: $auth_file"
+
     if [ "$force_auth" = true ]; then
         print_warning "Force re-authentication requested."
-        setup_auth
-    elif ! check_auth; then
-        print_warning "Authentication state not found."
-        setup_auth
+        setup_auth "$test_url"
+    elif ! check_auth "$test_url"; then
+        print_warning "Authentication state not found for this URL."
+        setup_auth "$test_url"
     else
-        print_success "Authentication state found."
+        print_success "Authentication state found for this URL."
     fi
 
     echo ""
@@ -213,7 +268,7 @@ main() {
     # Step 3: Run tests
     print_info "Test mode: $mode"
     echo ""
-    run_tests "$mode"
+    run_tests "$mode" "$test_url"
 }
 
 # Run main function

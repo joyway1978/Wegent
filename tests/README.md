@@ -47,8 +47,9 @@ npm run test:debug
 
 ## Configuration
 
-- Default test URL: `https://wegent.intra.weibo.com`
-- Override with: `TEST_BASE_URL=https://your-url ./run-tests.sh`
+- Default test URL: `http://localhost:3000`
+- Override with: `./run-tests.sh http://localhost:3002`
+- Or use environment variable: `TEST_BASE_URL=http://localhost:3002 ./run-tests.sh`
 
 ## Test Files
 
@@ -63,4 +64,21 @@ npm run test:debug
 | `-d, --debug` | Run tests in debug mode |
 | `-a, --auth` | Force re-authentication (re-scan QR code) |
 | `-i, --install` | Force reinstall dependencies |
+| `URL` | Target URL to test (e.g., `http://localhost:3002`) |
 | `--help` | Show help message |
+
+### Examples
+
+```bash
+# Test localhost (default)
+./run-tests.sh
+
+# Test specific URL
+./run-tests.sh http://localhost:3002
+
+# Test with browser visible
+./run-tests.sh -h http://localhost:3002
+
+# Using environment variable
+TEST_BASE_URL=http://localhost:3001 ./run-tests.sh
+```
