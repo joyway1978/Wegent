@@ -40,11 +40,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import { Download, Trash2, Sparkles, Globe, Plus, RefreshCw, GitBranch } from 'lucide-react'
+import {
+  Download,
+  Trash2,
+  Sparkles,
+  Globe,
+  Plus,
+  RefreshCw,
+  GitBranch,
+  UsersIcon,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import SkillUploadModal from './skills/SkillUploadModal'
 import { SkillReferenceConflictDialog } from './skills/SkillReferenceConflictDialog'
 import { useUser } from '@/features/common/UserContext'
+import { GroupMembersDialog } from './groups/GroupMembersDialog'
 
 interface SkillListWithScopeProps {
   scope: 'personal' | 'group' | 'all'
@@ -77,6 +87,13 @@ export function SkillListWithScope({ scope, selectedGroup }: SkillListWithScopeP
   // Reference conflict dialog state
   const [referenceConflictOpen, setReferenceConflictOpen] = useState(false)
   const [referencedGhosts, setReferencedGhosts] = useState<ReferencedGhost[]>([])
+
+  // Group members dialog state
+  const [showMembersDialog, setShowMembersDialog] = useState(false)
+
+  // Check if current user can manage members (Owner or Maintainer)
+  const canManageMembers =
+    currentGroup?.my_role === 'Owner' || currentGroup?.my_role === 'Maintainer'
 
   // Fetch group details when selectedGroup changes
   useEffect(() => {
@@ -332,6 +349,28 @@ export function SkillListWithScope({ scope, selectedGroup }: SkillListWithScopeP
     skill => !skill.is_public && skill.source?.type === 'git'
   )
 
+  // Handle opening members dialog
+  const handleManageMembers = () => {
+    if (currentGroup) {
+      setShowMembersDialog(true)
+    }
+  }
+
+  // Handle dialog close with refresh
+  const handleMembersDialogClose = () => {
+    setShowMembersDialog(false)
+    // Refresh group details to get updated member count
+    if (selectedGroup && scope === 'group') {
+      getGroup(selectedGroup)
+        .then(groupData => {
+          setCurrentGroup(groupData)
+        })
+        .catch(err => {
+          console.error('Failed to refresh group details:', err)
+        })
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -341,6 +380,13 @@ export function SkillListWithScope({ scope, selectedGroup }: SkillListWithScopeP
           <p className="text-sm text-text-secondary">{t('skills.description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Manage Members button - only show in group scope with permission */}
+          {scope === 'group' && currentGroup && canManageMembers && (
+            <Button onClick={handleManageMembers} size="sm" variant="outline">
+              <UsersIcon className="w-4 h-4 mr-1" />
+              {t('groups:groupManager.manageMembers')}
+            </Button>
+          )}
           {/* Update All from Git button - only show if there are git-imported skills */}
           {hasGitSkills && (
             <Button
@@ -591,6 +637,15 @@ export function SkillListWithScope({ scope, selectedGroup }: SkillListWithScopeP
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Group Members Management Dialog */}
+      <GroupMembersDialog
+        isOpen={showMembersDialog}
+        onClose={handleMembersDialogClose}
+        onSuccess={handleMembersDialogClose}
+        group={currentGroup}
+        currentUserId={user?.id}
+      />
     </div>
   )
 }
