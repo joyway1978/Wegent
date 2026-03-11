@@ -297,6 +297,7 @@ export default function TeamSelector({
     <div
       className="flex items-center space-x-2 min-w-0 flex-shrink"
       data-tour="team-selector"
+      data-testid="team-selector"
       style={{ maxWidth: isMobile ? 200 : 260, minWidth: isMobile ? 60 : 80 }}
     >
       {isMobile ? (

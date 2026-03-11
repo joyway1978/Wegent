@@ -103,7 +103,7 @@ export default function RepositorySelector({
   // Compact mode: use Popover with Command
   if (compact) {
     return (
-      <div className="flex items-center min-w-0" data-tour="repo-selector">
+      <div className="flex items-center min-w-0" data-tour="repo-selector" data-testid="repo-selector">
         <Popover open={compactOpen} onOpenChange={setCompactOpen}>
           <TooltipProvider>
             <Tooltip>
@@ -219,6 +219,7 @@ export default function RepositorySelector({
     <div
       className={cn('flex items-center min-w-0', fullWidth && 'w-full')}
       data-tour="repo-selector"
+      data-testid="repo-selector"
       style={fullWidth ? undefined : { maxWidth: isMobile ? 200 : 280 }}
     >
       <TooltipProvider>

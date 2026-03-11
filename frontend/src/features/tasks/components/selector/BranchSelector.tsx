@@ -207,7 +207,7 @@ export default function BranchSelector({
   // In compact mode, use Popover directly instead of hidden SearchableSelect
   if (compact) {
     return (
-      <div className="flex items-center min-w-0">
+      <div className="flex items-center min-w-0" data-testid="branch-selector">
         <Popover open={compactOpen} onOpenChange={setCompactOpen}>
           <TooltipProvider>
             <Tooltip>
@@ -318,7 +318,7 @@ export default function BranchSelector({
   }
 
   return (
-    <div className="flex items-center min-w-0">
+    <div className="flex items-center min-w-0" data-testid="branch-selector">
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
