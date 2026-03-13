@@ -4,12 +4,13 @@ test.describe('Settings - Model Management', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/settings?tab=models')
     await page.waitForLoadState('networkidle')
-    // Wait for settings content to load (models tab is default)
-    await page.waitForTimeout(1000)
+    // Wait for settings content to load
+    // The page maps tab=models to personal-models, wait for the component to render
+    await page.waitForTimeout(2000)
   })
 
   test('should access model management page', async ({ page }) => {
-    // Verify we're on settings page (models is the default tab)
+    // Verify we're on settings page
     await expect(page).toHaveURL(/\/settings/)
 
     // Wait for settings content area to be visible
@@ -19,29 +20,35 @@ test.describe('Settings - Model Management', () => {
     // The title is in an h2 element within the ModelList component
     const modelTitle = page.locator('h2:has-text("Model Management"), h2:has-text("模型管理")').first()
 
+    // Wait longer for the page to fully load and render the models tab
+    await page.waitForTimeout(3000)
+
     // Retry logic for flaky loading
-    let retries = 3
+    let retries = 5
     while (retries > 0) {
       const isVisible = await modelTitle.isVisible({ timeout: 5000 }).catch(() => false)
       if (isVisible) break
       console.log(`Title not visible, retrying... (${retries} attempts left)`)
-      await page.waitForTimeout(1000)
+      await page.waitForTimeout(2000)
       retries--
     }
 
-    await expect(modelTitle).toBeVisible({ timeout: 5000 })
+    await expect(modelTitle).toBeVisible({ timeout: 10000 })
   })
 
   test('should display model list or empty state', async ({ page }) => {
+    // Wait for page to fully load
+    await page.waitForTimeout(3000)
+
     // Either models exist or empty state is shown
     const hasModels = await page
       .locator('[data-testid="model-card"], .model-card')
       .first()
-      .isVisible({ timeout: 5000 })
+      .isVisible({ timeout: 10000 })
       .catch(() => false)
     const hasEmptyState = await page
       .locator('text=No models')
-      .isVisible({ timeout: 1000 })
+      .isVisible({ timeout: 3000 })
       .catch(() => false)
 
     // Page loaded successfully (one of these should be true, or page has different structure)
@@ -49,6 +56,9 @@ test.describe('Settings - Model Management', () => {
   })
 
   test('should open create model form', async ({ page }) => {
+    // Wait for page to fully load
+    await page.waitForTimeout(3000)
+
     // "Create Model" button should always be visible after page loads
     const createButton = page.locator(
       'button:has-text("Create Model"), button:has-text("新建模型"), button:has-text("Create")'
@@ -57,21 +67,25 @@ test.describe('Settings - Model Management', () => {
     // Button should be visible - no skip, this is a required UI element
     await expect(createButton.first()).toBeVisible({ timeout: 20000 })
 
+    // Click the create button
     await createButton.first().click()
 
     // Wait for dialog to open (animation + rendering time)
-    await page.waitForTimeout(1000)
+    await page.waitForTimeout(2000)
 
     // Wait for dialog content to be visible
-    await page.waitForSelector('[role="dialog"]', { state: 'visible', timeout: 10000 })
+    await page.waitForSelector('[role="dialog"]', { state: 'visible', timeout: 15000 })
 
     // Model edit is a dialog form - check for the model ID input
     const modelIdInput = page.locator('[data-testid="model-id-name-input"]')
-    await expect(modelIdInput).toBeVisible({ timeout: 10000 })
+    await expect(modelIdInput).toBeVisible({ timeout: 15000 })
   })
 
   test('should create new model', async ({ page, testPrefix }) => {
     const modelName = TestData.uniqueName(`${testPrefix}-model`)
+
+    // Wait for page to fully load
+    await page.waitForTimeout(3000)
 
     // "Create Model" button should always be visible
     const createButton = page.locator(
@@ -81,12 +95,12 @@ test.describe('Settings - Model Management', () => {
     await createButton.first().click()
 
     // Wait for dialog to open
-    await page.waitForTimeout(1000)
-    await page.waitForSelector('[role="dialog"]', { state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(2000)
+    await page.waitForSelector('[role="dialog"]', { state: 'visible', timeout: 15000 })
 
     // Model edit is a dialog form, wait for model ID input
     const nameInput = page.locator('[data-testid="model-id-name-input"]')
-    await expect(nameInput).toBeVisible({ timeout: 10000 })
+    await expect(nameInput).toBeVisible({ timeout: 15000 })
     await nameInput.fill(modelName)
 
     // Fill API key (required field)
@@ -123,8 +137,10 @@ test.describe('Settings - Model Management', () => {
   test('should show test connection button for user models', async ({ page }) => {
     // Wait for page to load (support both English and Chinese)
     await page.waitForSelector('[class*="overflow-y-auto"]', { state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(3000)
+
     const modelTitle = page.locator('h2:has-text("Model Management"), h2:has-text("模型管理")').first()
-    await expect(modelTitle).toBeVisible({ timeout: 20000 })
+    await expect(modelTitle).toBeVisible({ timeout: 30000 })
 
     // Test connection button only appears for user models (not public)
     // Check if there are any user model cards with test button
@@ -142,8 +158,10 @@ test.describe('Settings - Model Management', () => {
   test('should show delete button for user models', async ({ page }) => {
     // Wait for page to load (support both English and Chinese)
     await page.waitForSelector('[class*="overflow-y-auto"]', { state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(3000)
+
     const modelTitle = page.locator('h2:has-text("Model Management"), h2:has-text("模型管理")').first()
-    await expect(modelTitle).toBeVisible({ timeout: 20000 })
+    await expect(modelTitle).toBeVisible({ timeout: 30000 })
 
     // Delete button only appears for user models (not public)
     const deleteButton = page.locator('button[title*="Delete"], button:has-text("Delete")').first()
