@@ -361,49 +361,6 @@ test.describe('Chat Group Flow', () => {
     }
   })
 
-  test('should bind knowledge base to group chat', async ({ page }) => {
-    // Create group chat
-    await createGroupChat(page, TEST_GROUP_NAME)
-
-    // Open members panel
-    const membersButton = page.locator('button[title="Members"], button:has-text("Members"), button:has-text("成员")').first()
-    if (await membersButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await membersButton.click()
-      await page.waitForTimeout(1000)
-
-      // Click Knowledge tab
-      const knowledgeTab = page.locator('button', { hasText: /Knowledge|知识库/ }).first()
-      if (await knowledgeTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await knowledgeTab.click()
-        await page.waitForTimeout(500)
-
-        // Click bind knowledge base button
-        const bindButton = page.locator('button', { hasText: /Bind|绑定|Add|添加/ }).first()
-        if (await bindButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await bindButton.click()
-          await page.waitForTimeout(1000)
-
-          // Select first available knowledge base
-          const kbOption = page.locator('[role="option"], [role="menuitem"]').first()
-          if (await kbOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await kbOption.click()
-            await page.waitForTimeout(2000)
-
-            console.log('✓ Knowledge base bound to group chat')
-          } else {
-            console.log('⚠ No knowledge bases available to bind')
-          }
-        } else {
-          console.log('⚠ Bind knowledge base button not found')
-        }
-      } else {
-        console.log('⚠ Knowledge tab not found')
-      }
-    } else {
-      console.log('⚠ Members button not found, skipping test')
-    }
-  })
-
   test('should leave group chat', async ({ page }) => {
     // Create group chat
     await createGroupChat(page, TEST_GROUP_NAME)

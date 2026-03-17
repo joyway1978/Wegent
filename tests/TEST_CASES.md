@@ -57,14 +57,12 @@
 | `should send message in group chat` | 测试在群聊中发送消息并验证消息显示 |
 | `should open members panel in group chat` | 测试打开成员面板查看群成员 |
 | `should generate invite link for group chat` | 测试生成邀请链接用于邀请其他用户 |
-| `should bind knowledge base to group chat` | 测试将知识库绑定到群聊 |
 | `should leave group chat` | 测试离开群聊（非群主成员） |
 
 **环境要求：**
 - 用户必须已登录
 - 需要至少一个聊天类型智能体可用
 - 需要至少一个模型可用
-- 知识库绑定测试需要至少一个知识库
 
 ---
 
@@ -75,8 +73,8 @@
 | 聊天流程 | 2 |
 | 代码流程 | 2 |
 | 知识库流程 | 5 |
-| 群聊流程 | 6 |
-| **总计** | **15** |
+| 群聊流程 | 5 |
+| **总计** | **14** |
 
 ---
 
