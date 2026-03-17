@@ -152,9 +152,10 @@ run_tests() {
         print_info "Running tests matching: $test_pattern"
     fi
 
-    # Set default workers to 5 if not specified
+    # Set default workers to 1 (serial) for stability
+    # Tests share the same user account, so concurrent execution causes interference
     if [ -z "$workers" ]; then
-        workers=5
+        workers=1
     fi
     print_info "Running with $workers concurrent workers"
 
@@ -205,7 +206,7 @@ show_usage() {
     echo "  -a, --auth       Force re-authentication (re-scan QR code)"
     echo "  -i, --install    Force reinstall dependencies"
     echo "  -t, --test       Run specific test by name (e.g., -t clarification)"
-    echo "  -w, --workers    Set concurrent workers (default: 5, use 1 for sequential)"
+    echo "  -w, --workers    Set concurrent workers (default: 1, use higher for faster but less stable)"
     echo "  --help           Show this help message"
     echo ""
     echo "Arguments:"
