@@ -32,6 +32,17 @@ async function setupChatPage(page: any) {
     document.querySelectorAll('.driver-overlay, .driver-popover, .driver-popover-tip').forEach(el => el.remove())
   })
 
+  // Remove Next.js dev overlay if present (it can block pointer events)
+  await page.evaluate(() => {
+    const closeButton = document.querySelector('nextjs-portal button[aria-label="Close"]') as HTMLElement
+    if (closeButton) closeButton.click()
+    document.querySelectorAll('nextjs-portal').forEach(el => {
+      if (el.querySelector('[data-nextjs-dev-overlay]')) {
+        el.remove()
+      }
+    })
+  })
+
   // Wait for any animations to complete
   await page.waitForTimeout(500)
 

@@ -77,6 +77,21 @@ async function setupKnowledgePage(page: any) {
     document.querySelectorAll('.driver-overlay, .driver-popover, .driver-popover-tip').forEach(el => el.remove())
   })
 
+  // Remove Next.js dev overlay if present (it can block pointer events)
+  await page.evaluate(() => {
+    // Close error overlay
+    const closeButton = document.querySelector('nextjs-portal button[aria-label="Close"]') as HTMLElement
+    if (closeButton) closeButton.click()
+
+    // Remove the overlay entirely
+    document.querySelectorAll('nextjs-portal').forEach(el => {
+      // Only remove if it's the error overlay (not the root portal)
+      if (el.querySelector('[data-nextjs-dev-overlay]')) {
+        el.remove()
+      }
+    })
+  })
+
   // Wait for page to stabilize
   await page.waitForTimeout(1000)
 }
