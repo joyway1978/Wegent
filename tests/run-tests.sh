@@ -3,6 +3,28 @@
 # Wegent Integration Tests Runner
 # This script handles dependency installation, authentication setup, and test execution
 
+# 中文说明 / Chinese Notes:
+# 关于并发测试的说明 / About Concurrent Testing:
+#   本测试套件默认使用串行执行（workers=1），因为所有测试共享同一个用户账户。
+#   This test suite defaults to serial execution (workers=1) because all tests share the same user account.
+#
+#   并发测试（-w N, N>1）容易导致以下问题：
+#   Concurrent testing (-w N, N>1) can cause the following issues:
+#   1. 代码流程测试（Code Flow）：并发时页面导航会互相干扰，导致消息发送后无法跳转到任务视图
+#      Code Flow tests: Concurrent page navigation interferes, causing failure to navigate to task view after sending messages
+#   2. 群聊测试（Chat Group Flow）：并发创建群聊会互相可见，左侧栏堆积大量测试群，影响后续测试
+#      Chat Group Flow tests: Concurrent group creation causes groups to be visible to each other,
+#      causing the sidebar to accumulate test groups and affecting subsequent tests
+#
+#   如需使用并发测试以提高速度，可以使用 -w 参数：
+#   To use concurrent testing for faster execution, use the -w flag:
+#     sh run-tests.sh -w 5 http://localhost:3000
+#   但请注意，并发模式下部分测试可能会失败。
+#   Note: Some tests may fail in concurrent mode.
+#
+#   推荐：使用默认的串行模式进行测试，确保稳定性。
+#   Recommended: Use the default serial mode for stable test execution.
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
