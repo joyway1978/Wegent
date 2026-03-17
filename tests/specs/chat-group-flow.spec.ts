@@ -219,7 +219,12 @@ async function cleanupAllTestGroups(page: any, testId: string) {
 
 // ==================== Test Suite ====================
 
+// Configure Chat Group Flow to run serially (not in parallel with other tests)
+// This is necessary because all workers share the same user account,
+// and concurrent group chat creation causes interference
 test.describe('Chat Group Flow', () => {
+  test.describe.configure({ mode: 'serial' })
+
   test.beforeEach(async ({ page }) => {
     // First cleanup any leftover test groups from this test run
     await cleanupAllTestGroups(page, TEST_ID)
