@@ -97,6 +97,25 @@ const submitButton = page.locator('.btn-primary').first()
 
 ---
 
+### Chat Group Flow Tests (`specs/chat-group-flow.spec.ts`)
+
+| Test Case | Description |
+|-----------|-------------|
+| `should create a new group chat` | Tests creating a new group chat with title, team, and model selection |
+| `should send message in group chat` | Tests sending a message in group chat and verifying it appears |
+| `should open members panel in group chat` | Tests opening the members panel to view group members |
+| `should generate invite link for group chat` | Tests generating an invite link for inviting other users |
+| `should bind knowledge base to group chat` | Tests binding a knowledge base to the group chat |
+| `should leave group chat` | Tests leaving a group chat (non-owner member) |
+
+**Setup Requirements:**
+- User must be logged in
+- Requires at least one chat-type team/agent to be available
+- Requires at least one model to be available
+- For knowledge base binding test, requires at least one knowledge base
+
+---
+
 ## Common Setup Functions
 
 ### Chat Page Setup (`setupChatPage`)
@@ -114,6 +133,12 @@ const submitButton = page.locator('.btn-primary').first()
 
 ### Knowledge Page Setup (`setupKnowledgePage`)
 - Navigates to `/knowledge`
+- Handles login if needed (admin/Wegent2025!)
+- Skips onboarding tour via localStorage
+- Removes driver.js overlays
+
+### Chat Group Page Setup (`setupChatGroupPage`)
+- Navigates to `/chat`
 - Handles login if needed (admin/Wegent2025!)
 - Skips onboarding tour via localStorage
 - Removes driver.js overlays
