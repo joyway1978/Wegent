@@ -186,7 +186,7 @@ test.describe('Code Flow', () => {
     await sendButton.click()
 
     // Wait for page navigation to task view (URL should change from /code to /code?taskId=xxx)
-    await page.waitForURL('**/code**', { timeout: 30000 })
+    await page.waitForURL(/\/code\?.*taskId=/, { timeout: 30000 })
     await page.waitForTimeout(2000)
 
     // Wait for AI response - use more flexible selector
@@ -242,7 +242,7 @@ test.describe('Code Flow', () => {
     console.log('Message sent, waiting for response...')
 
     // Wait for page navigation to task view (URL should change from /code to /code?taskId=xxx)
-    await page.waitForURL('**/code**', { timeout: 30000 })
+    await page.waitForURL(/\/code\?.*taskId=/, { timeout: 30000 })
     await page.waitForTimeout(2000)
 
     // Wait for AI response
