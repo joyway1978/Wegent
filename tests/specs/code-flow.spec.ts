@@ -177,6 +177,10 @@ async function setupCodePage(page: any) {
 }
 
 test.describe('Code Flow', () => {
+  // Code Flow tests need to run serially because they share the same page state
+  // and concurrent execution causes navigation issues
+test.describe.configure({ mode: 'serial' })
+
   test('should analyze repository and provide code suggestions', async ({ page }) => {
     test.setTimeout(300000) // 5 minutes timeout for AI response
 
