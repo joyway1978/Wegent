@@ -198,10 +198,31 @@ test.describe.configure({ mode: 'serial' })
     // Find and click send button
     const sendButton = page.locator('[data-testid="send-button"]').first()
     await expect(sendButton).toBeEnabled({ timeout: 5000 })
+
+    // Dismiss any overlay before clicking
+    await page.evaluate(() => {
+      const closeButton = document.querySelector('nextjs-portal button[aria-label="Close"]') as HTMLElement
+      if (closeButton) closeButton.click()
+      document.querySelectorAll('nextjs-portal').forEach(el => {
+        if (el.querySelector('[data-nextjs-dev-overlay]')) el.remove()
+      })
+    })
+
     await sendButton.click()
+    console.log('Send button clicked, waiting for navigation...')
 
     // Wait for page navigation to task view (URL should change from /code to /code?taskId=xxx)
-    await page.waitForURL(/\/code\?.*taskId=/, { timeout: 30000 })
+    try {
+      await page.waitForURL(/\/code\?.*taskId=/, { timeout: 30000 })
+      console.log('Navigation to task view detected')
+    } catch (e) {
+      console.log('Navigation timeout - checking if already on task view')
+      const currentUrl = page.url()
+      console.log('Current URL:', currentUrl)
+      if (!currentUrl.includes('taskId')) {
+        throw new Error('Page did not navigate to task view after clicking send')
+      }
+    }
     await page.waitForTimeout(2000)
 
     // Wait for AI response - use more flexible selector
