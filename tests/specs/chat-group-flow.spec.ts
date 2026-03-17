@@ -123,9 +123,17 @@ async function createGroupChat(page: any, name: string) {
     }
   }
 
+  // Wait for model loading to complete (if model dropdown shows "Loading...")
+  const modelLoading = dialog.locator('text=Loading...').first()
+  if (await modelLoading.isVisible({ timeout: 2000 }).catch(() => false)) {
+    console.log('Waiting for models to load...')
+    await modelLoading.waitFor({ state: 'hidden', timeout: 15000 })
+    await page.waitForTimeout(500)
+  }
+
   // Submit - wait for button to be enabled
   const submitButton = dialog.locator('button', { hasText: /Create|创建/ }).first()
-  await expect(submitButton).toBeEnabled({ timeout: 10000 })
+  await expect(submitButton).toBeEnabled({ timeout: 15000 })
   await submitButton.click()
 
   // Wait for dialog to close and navigation to group chat
