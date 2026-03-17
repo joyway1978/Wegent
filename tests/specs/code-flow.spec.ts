@@ -185,30 +185,36 @@ test.describe('Code Flow', () => {
     await expect(sendButton).toBeEnabled({ timeout: 5000 })
     await sendButton.click()
 
-    // Wait for AI response
-    const messagesContainer = page.locator('.messages-container').first()
+    // Wait for AI response - use more flexible selector
+    const messagesContainer = page.locator('[data-testid="messages-container"]').first()
     await expect(messagesContainer).toBeVisible({ timeout: 30000 })
 
-    // Wait for AI message to appear
-    const aiMessage = messagesContainer.locator('> div').filter({
-      has: page.locator('svg.lucide-bot'),
-    }).last()
+    // Wait for AI message to appear (AI messages have data-testid="ai-message-icon")
+    const aiMessage = messagesContainer.locator('[data-message-type="ai"]').first()
     await expect(aiMessage).toBeVisible({ timeout: 120000 })
+
+    // Wait for the AI icon to confirm it's an AI message
+    const aiIcon = aiMessage.locator('[data-testid="ai-message-icon"]').first()
+    await expect(aiIcon).toBeVisible({ timeout: 10000 })
+
+    // Wait for streaming to complete
+    await page.waitForTimeout(5000)
 
     // Wait for streaming to complete
     await page.waitForTimeout(5000)
 
     // Verify the response
-    const allMessages = await messagesContainer.locator('> div').all()
+    const allMessages = await messagesContainer.locator('[data-message-type]').all()
     expect(allMessages.length).toBeGreaterThanOrEqual(2)
 
     // Verify user message
-    const userMessage = allMessages[allMessages.length - 2]
+    const userMessage = messagesContainer.locator('[data-message-type="user"]').first()
     const userMessageText = await userMessage.textContent()
     expect(userMessageText).toContain(testMessage)
 
     // Verify AI message has content
-    const aiMessageText = await aiMessage.textContent()
+    const aiMessageFinal = messagesContainer.locator('[data-message-type="ai"]').last()
+    const aiMessageText = await aiMessageFinal.textContent()
     expect(aiMessageText).toBeTruthy()
     expect(aiMessageText!.length).toBeGreaterThan(20)
 
@@ -235,20 +241,19 @@ test.describe('Code Flow', () => {
     await page.waitForTimeout(2000)
 
     // Wait for AI response
-    const messagesContainer = page.locator('.messages-container').first()
+    const messagesContainer = page.locator('[data-testid="messages-container"]').first()
     await expect(messagesContainer).toBeVisible({ timeout: 30000 })
 
-    // Wait for AI message
-    const aiMessage = messagesContainer.locator('> div').filter({
-      has: page.locator('svg.lucide-bot'),
-    }).last()
+    // Wait for AI message (AI messages have data-message-type="ai")
+    const aiMessage = messagesContainer.locator('[data-message-type="ai"]').first()
     await expect(aiMessage).toBeVisible({ timeout: 120000 })
 
     // Wait for streaming to complete
     await page.waitForTimeout(5000)
 
     // Check if AI response has meaningful content
-    const aiMessageText = await aiMessage.textContent()
+    const aiMessageFinal = messagesContainer.locator('[data-message-type="ai"]').last()
+    const aiMessageText = await aiMessageFinal.textContent()
     console.log('AI Response:', aiMessageText?.substring(0, 300) + '...')
 
     // Verify AI responded with some content (at least 10 characters)

@@ -132,6 +132,7 @@ run_tests() {
     local mode=$1
     local test_url=$2
     local test_pattern=$3
+    local workers=$4
     local auth_file=$(get_auth_file "$test_url")
 
     cd "$SCRIPT_DIR"
@@ -151,21 +152,30 @@ run_tests() {
         print_info "Running tests matching: $test_pattern"
     fi
 
+    # Set default workers to 5 if not specified
+    if [ -z "$workers" ]; then
+        workers=5
+    fi
+    print_info "Running with $workers concurrent workers"
+
+    # Build workers argument
+    local workers_arg="--workers=$workers"
+
     case $mode in
         "headed")
             print_info "Running tests in headed mode (with browser UI)..."
             if [ -n "$test_pattern" ]; then
-                npx playwright test -g "$test_pattern" --headed
+                npx playwright test -g "$test_pattern" --headed $workers_arg
             else
-                npm run test:headed
+                npx playwright test --headed $workers_arg
             fi
             ;;
         "headless")
             print_info "Running tests in headless mode..."
             if [ -n "$test_pattern" ]; then
-                npx playwright test -g "$test_pattern"
+                npx playwright test -g "$test_pattern" $workers_arg
             else
-                npm test
+                npx playwright test $workers_arg
             fi
             ;;
         "debug")
@@ -195,6 +205,7 @@ show_usage() {
     echo "  -a, --auth       Force re-authentication (re-scan QR code)"
     echo "  -i, --install    Force reinstall dependencies"
     echo "  -t, --test       Run specific test by name (e.g., -t clarification)"
+    echo "  -w, --workers    Set concurrent workers (default: 5, use 1 for sequential)"
     echo "  --help           Show this help message"
     echo ""
     echo "Arguments:"
@@ -211,6 +222,8 @@ show_usage() {
     echo "  $0 -a                              # Re-authenticate and run tests"
     echo "  $0 -t clarification                # Run only clarification mode test"
     echo "  $0 -t chat                         # Run tests matching 'chat' in name"
+    echo "  $0 -w 1                            # Run sequentially (1 worker)"
+    echo "  $0 -w 10                           # Run with 10 concurrent workers"
     echo "  TEST_BASE_URL=http://localhost:3000 $0"
     echo ""
 }
@@ -221,6 +234,7 @@ main() {
     local force_auth=false
     local force_install=false
     local test_pattern=""
+    local workers=""
     local test_url="${TEST_BASE_URL:-https://wegent.intra.weibo.com}"
 
     # Parse arguments
@@ -261,12 +275,27 @@ main() {
                 test_pattern="$2"
                 shift 2
                 ;;
+            -w|--workers)
+                # Check if next argument exists and is a number
+                if [[ $# -lt 2 ]]; then
+                    print_error "Missing worker count after -w/--workers"
+                    show_usage
+                    exit 1
+                fi
+                if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                    print_error "Worker count must be a number: $2"
+                    show_usage
+                    exit 1
+                fi
+                workers="$2"
+                shift 2
+                ;;
             --help)
                 show_usage
                 exit 0
                 ;;
             # Handle combined short options (e.g., -ht)
-            -[hldiat]*)
+            -[hldiatw]*)
                 # Extract individual flags from combined option
                 local flags="${1#-}"
                 local i
@@ -289,6 +318,31 @@ main() {
                                 exit 1
                             else
                                 test_pattern="$2"
+                                shift
+                            fi
+                            ;;
+                        w)
+                            # For -w, the rest of the string or next argument is the worker count
+                            if [[ $i -lt $((${#flags}-1)) ]]; then
+                                # Workers is the rest of this combined option
+                                workers="${flags:$((i+1))}"
+                                if ! [[ "$workers" =~ ^[0-9]+$ ]]; then
+                                    print_error "Worker count must be a number: $workers"
+                                    show_usage
+                                    exit 1
+                                fi
+                                break
+                            elif [[ $# -lt 2 || "$2" =~ ^- ]]; then
+                                print_error "Missing worker count after -w in combined options"
+                                show_usage
+                                exit 1
+                            else
+                                workers="$2"
+                                if ! [[ "$workers" =~ ^[0-9]+$ ]]; then
+                                    print_error "Worker count must be a number: $workers"
+                                    show_usage
+                                    exit 1
+                                fi
                                 shift
                             fi
                             ;;
@@ -353,7 +407,7 @@ main() {
         print_info "Test filter: $test_pattern"
     fi
     echo ""
-    run_tests "$mode" "$test_url" "$test_pattern"
+    run_tests "$mode" "$test_url" "$test_pattern" "$workers"
 }
 
 # Run main function

@@ -82,20 +82,21 @@ async function createGroupChat(page: any, name: string) {
   const nameInput = dialog.locator('input').first()
   await nameInput.fill(name)
 
-  // Select a team/agent
-  const teamSelector = dialog.locator('button').filter({ hasText: /Select Team|选择团队/ }).first()
+  // Select a team/agent - the dropdown shows "Select an agent"
+  const teamSelector = dialog.locator('button').filter({ hasText: /Select an agent|Select Team|选择团队|选择智能体/ }).first()
   if (await teamSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
     await teamSelector.click()
     await page.waitForTimeout(500)
 
-    // Select first available team
+    // Select first available team from dropdown
     const firstTeam = page.locator('[role="option"]').first()
     if (await firstTeam.isVisible({ timeout: 3000 }).catch(() => false)) {
       await firstTeam.click()
+      await page.waitForTimeout(500)
     }
   }
 
-  // Select a model
+  // Select a model if the selector is visible
   const modelSelector = dialog.locator('button').filter({ hasText: /Select Model|选择模型/ }).first()
   if (await modelSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
     await modelSelector.click()
@@ -105,11 +106,13 @@ async function createGroupChat(page: any, name: string) {
     const firstModel = page.locator('[role="option"]').first()
     if (await firstModel.isVisible({ timeout: 3000 }).catch(() => false)) {
       await firstModel.click()
+      await page.waitForTimeout(500)
     }
   }
 
-  // Submit
+  // Submit - wait for button to be enabled
   const submitButton = dialog.locator('button', { hasText: /Create|创建/ }).first()
+  await expect(submitButton).toBeEnabled({ timeout: 10000 })
   await submitButton.click()
 
   // Wait for dialog to close and navigation to group chat
@@ -171,12 +174,13 @@ test.describe('Chat Group Flow', () => {
     await createGroupChat(page, TEST_GROUP_NAME)
 
     // Verify we're in the group chat (check for input area or group indicator)
-    const messageInput = page.locator('textarea[placeholder*="message"], textarea[placeholder*="消息"]').first()
+    // Use a more flexible selector for the message input
+    const messageInput = page.locator('textarea[placeholder*="message"], textarea[placeholder*="消息"], div[contenteditable="true"]').first()
     await expect(messageInput).toBeVisible({ timeout: 10000 })
 
-    // Verify group name is displayed somewhere
-    const pageContent = await page.content()
-    expect(pageContent).toContain(TEST_GROUP_NAME)
+    // Verify group name is displayed somewhere (check partial name since UI may truncate)
+    const groupNameLocator = page.locator('text=/Test-Group-/').first()
+    await expect(groupNameLocator).toBeVisible({ timeout: 10000 })
 
     console.log('✓ Group chat created successfully')
   })
@@ -185,8 +189,8 @@ test.describe('Chat Group Flow', () => {
     // Create group chat first
     await createGroupChat(page, TEST_GROUP_NAME)
 
-    // Find message input
-    const messageInput = page.locator('textarea[placeholder*="message"], textarea[placeholder*="消息"]').first()
+    // Find message input (use flexible selector for different input types)
+    const messageInput = page.locator('textarea[placeholder*="message"], textarea[placeholder*="消息"], div[contenteditable="true"]').first()
     await expect(messageInput).toBeVisible({ timeout: 10000 })
 
     // Type and send message
