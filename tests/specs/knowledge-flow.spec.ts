@@ -159,10 +159,62 @@ async function deleteKnowledgeBase(page: any, name: string) {
   }
 }
 
+/**
+ * Cleanup all test knowledge bases with matching TEST_ID prefix
+ * Used for concurrent test isolation - cleans up any leftover KBs from this test run
+ */
+async function cleanupAllTestKnowledgeBases(page: any, testId: string) {
+  await page.goto('/knowledge')
+  await page.waitForLoadState('networkidle', { timeout: 30000 })
+  await page.waitForTimeout(2000)
+
+  const kbPattern = `Test-KB-${testId}`
+  let cleanedCount = 0
+
+  // Keep trying to clean until no more matching KBs found
+  for (let attempt = 0; attempt < 10; attempt++) {
+    // Find any KB with our test ID pattern
+    const kbCards = page.locator('h3', { hasText: new RegExp(kbPattern) })
+    const count = await kbCards.count()
+
+    if (count === 0) break
+
+    // Try to delete the first matching KB
+    const firstKb = kbCards.first()
+    if (await firstKb.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const card = firstKb.locator('..').locator('..').first()
+      const deleteButton = card.locator('button[title="Delete"], button:has-text("Delete")').first()
+
+      if (await deleteButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await deleteButton.click()
+
+        const confirmDialog = page.locator('[role="dialog"]').filter({ hasText: /Delete|Confirm/ }).first()
+        if (await confirmDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+          const confirmButton = confirmDialog.locator('button:has-text("Delete"), button:has-text("Confirm")').first()
+          await confirmButton.click()
+          await page.waitForTimeout(1500)
+          cleanedCount++
+        }
+      }
+
+      // Refresh page to find next KB
+      await page.goto('/knowledge')
+      await page.waitForTimeout(2000)
+    }
+  }
+
+  if (cleanedCount > 0) {
+    console.log(`✓ Cleaned up ${cleanedCount} leftover test knowledge bases`)
+  }
+}
+
 // ==================== Test Suite ====================
 
 test.describe('Knowledge Flow', () => {
   test.beforeEach(async ({ page }) => {
+    // First cleanup any leftover test KBs from this test run
+    await cleanupAllTestKnowledgeBases(page, TEST_ID)
+    // Then setup the page
     await setupKnowledgePage(page)
   })
 

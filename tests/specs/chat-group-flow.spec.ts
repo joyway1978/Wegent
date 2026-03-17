@@ -159,10 +159,71 @@ async function cleanupGroupChat(page: any, name: string) {
   }
 }
 
+/**
+ * Cleanup all test groups with matching TEST_ID prefix
+ * Used for concurrent test isolation - cleans up any leftover groups from this test run
+ */
+async function cleanupAllTestGroups(page: any, testId: string) {
+  await page.goto('/chat')
+  await page.waitForTimeout(2000)
+
+  // Find all group items that match our TEST_ID pattern
+  // Test groups are named: Test-Group-{TEST_ID}-{timestamp}
+  const groupPattern = `Test-Group-${testId}`
+  let cleanedCount = 0
+
+  // Keep trying to clean until no more matching groups found
+  for (let attempt = 0; attempt < 10; attempt++) {
+    // Find any group item with our test ID pattern
+    const groupItems = page.locator('button', { hasText: new RegExp(groupPattern) })
+    const count = await groupItems.count()
+
+    if (count === 0) break
+
+    // Try to leave the first matching group
+    const firstGroup = groupItems.first()
+    if (await firstGroup.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await firstGroup.click()
+      await page.waitForTimeout(1500)
+
+      // Try to find and click menu/leave button
+      const membersButton = page.locator('button:has-text("Members"), button:has-text("成员"), button[title="Members"]').first()
+      if (await membersButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await membersButton.click()
+        await page.waitForTimeout(1000)
+
+        const leaveButton = page.locator('button', { hasText: /Leave|离开/ }).first()
+        if (await leaveButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await leaveButton.click()
+          await page.waitForTimeout(1000)
+
+          const confirmButton = page.locator('button', { hasText: /Confirm|确认|Leave|离开/ }).first()
+          if (await confirmButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await confirmButton.click()
+            await page.waitForTimeout(2000)
+            cleanedCount++
+          }
+        }
+      }
+
+      // Go back to chat page to find next group
+      await page.goto('/chat')
+      await page.waitForTimeout(1500)
+    }
+  }
+
+  if (cleanedCount > 0) {
+    console.log(`✓ Cleaned up ${cleanedCount} leftover test groups`)
+  }
+}
+
 // ==================== Test Suite ====================
 
 test.describe('Chat Group Flow', () => {
   test.beforeEach(async ({ page }) => {
+    // First cleanup any leftover test groups from this test run
+    await cleanupAllTestGroups(page, TEST_ID)
+    // Then setup the page
     await setupChatGroupPage(page)
   })
 
