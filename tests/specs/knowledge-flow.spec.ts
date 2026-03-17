@@ -52,6 +52,32 @@ async function loginIfNeeded(page: any) {
 }
 
 /**
+ * Helper to dismiss Next.js dev overlay before critical clicks
+ */
+async function dismissDevOverlay(page: any) {
+  await page.evaluate(() => {
+    // Method 1: Click close button
+    const closeButton = document.querySelector('nextjs-portal button[aria-label="Close"]') as HTMLElement
+    if (closeButton) closeButton.click()
+
+    // Method 2: Remove all nextjs-portal elements
+    document.querySelectorAll('nextjs-portal').forEach(el => {
+      if (el.querySelector('[data-nextjs-dev-overlay]')) {
+        el.remove()
+      }
+    })
+
+    // Method 3: Hide overlay with CSS
+    const style = document.createElement('style')
+    style.textContent = `
+      nextjs-portal { display: none !important; }
+      [data-nextjs-dev-overlay] { display: none !important; }
+    `
+    document.head.appendChild(style)
+  })
+}
+
+/**
  * Skip onboarding tour and navigate to knowledge page
  */
 async function setupKnowledgePage(page: any) {
@@ -273,6 +299,8 @@ test.describe('Knowledge Flow', () => {
     // Look for settings or convert option
     const settingsButton = page.locator('button:has-text("Settings"), button[title="Settings"]').first()
     if (await settingsButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // Dismiss any overlay before clicking
+      await dismissDevOverlay(page)
       await settingsButton.click()
 
       // Try to find convert option
