@@ -9,7 +9,9 @@ import { test, expect } from '@playwright/test'
  */
 
 // ==================== Test Data ====================
-const TEST_KB_NAME = `Test-KB-${Date.now()}`
+// Use random suffix for concurrent test isolation
+const TEST_ID = Math.random().toString(36).substring(2, 8)
+const TEST_KB_NAME = `Test-KB-${TEST_ID}-${Date.now()}`
 const TEST_KB_DESCRIPTION = 'Test knowledge base for E2E testing'
 const TEST_FILE_NAME = 'test-document.txt'
 

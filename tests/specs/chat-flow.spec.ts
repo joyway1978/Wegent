@@ -89,12 +89,15 @@ async function setupChatPage(page: any) {
   return chatInput
 }
 
+// Generate unique test ID for concurrent test isolation
+const TEST_ID = Math.random().toString(36).substring(2, 8)
+
 test.describe('Chat Flow', () => {
   test('should send message and receive AI response', async ({ page }) => {
     const chatInput = await setupChatPage(page)
 
-    // Type test message
-    const testMessage = 'Hello, this is a test message. Please respond with a short greeting.'
+    // Type test message with unique ID for isolation
+    const testMessage = `Hello, this is a test message [${TEST_ID}]. Please respond with a short greeting.`
     await chatInput.fill(testMessage)
 
     // Find and click send button

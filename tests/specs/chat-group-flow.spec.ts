@@ -13,7 +13,9 @@ import { test, expect } from '@playwright/test'
  */
 
 // ==================== Test Data ====================
-const TEST_GROUP_NAME = `Test-Group-${Date.now()}`
+// Use random suffix for concurrent test isolation
+const TEST_ID = Math.random().toString(36).substring(2, 8)
+const TEST_GROUP_NAME = `Test-Group-${TEST_ID}-${Date.now()}`
 const TEST_MESSAGE = 'Hello, this is a test message in group chat!'
 
 // ==================== Helper Functions ====================
@@ -196,7 +198,8 @@ test.describe('Chat Group Flow', () => {
     // Type and send message
     await messageInput.fill(TEST_MESSAGE)
 
-    const sendButton = page.locator('button[type="submit"], button:has-text("Send")').first()
+    const sendButton = page.locator('[data-testid="send-button"]').first()
+    await expect(sendButton).toBeVisible({ timeout: 5000 })
     await sendButton.click()
 
     // Wait for message to appear

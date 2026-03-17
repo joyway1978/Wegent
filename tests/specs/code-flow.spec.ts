@@ -185,6 +185,10 @@ test.describe('Code Flow', () => {
     await expect(sendButton).toBeEnabled({ timeout: 5000 })
     await sendButton.click()
 
+    // Wait for page navigation to task view (URL should change from /code to /code?taskId=xxx)
+    await page.waitForURL('**/code**', { timeout: 30000 })
+    await page.waitForTimeout(2000)
+
     // Wait for AI response - use more flexible selector
     const messagesContainer = page.locator('[data-testid="messages-container"]').first()
     await expect(messagesContainer).toBeVisible({ timeout: 30000 })
@@ -237,7 +241,8 @@ test.describe('Code Flow', () => {
     await sendButton.click()
     console.log('Message sent, waiting for response...')
 
-    // Wait for page to transition to chat view
+    // Wait for page navigation to task view (URL should change from /code to /code?taskId=xxx)
+    await page.waitForURL('**/code**', { timeout: 30000 })
     await page.waitForTimeout(2000)
 
     // Wait for AI response
