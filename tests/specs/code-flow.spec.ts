@@ -68,25 +68,64 @@ async function setupCodePage(page: any) {
     const isCloudIdeVisible = await cloudIdeHeading.isVisible({ timeout: 3000 }).catch(() => false)
 
     if (isCloudIdeVisible) {
-      // Click on the card using data-testid instead of the heading
-      // The card has the onClick handler, not the heading
-      const cloudIdeCard = page.locator('[data-testid="onboarding-cloud-ide-option"]').first()
-      const isCardVisible = await cloudIdeCard.isVisible({ timeout: 3000 }).catch(() => false)
+      // Strategy: Find the clickable parent element of the h3 heading
+      // Try multiple approaches to find the actual clickable card
+      let clicked = false
 
-      if (isCardVisible) {
-        await cloudIdeCard.click()
-        console.log('✓ Clicked: 使用WeCode云IDE (card)')
-      } else {
-        // Fallback: try clicking the heading's parent element
-        await cloudIdeHeading.locator('..').click()
-        console.log('✓ Clicked: 使用WeCode云IDE (parent)')
+      // Strategy 1: Try clicking the heading itself (it might have click handler)
+      try {
+        await cloudIdeHeading.click({ timeout: 2000 })
+        console.log('✓ Clicked: 使用WeCode云IDE (heading)')
+        clicked = true
+      } catch {
+        // Continue to next strategy
+      }
+
+      // Strategy 2: Use XPath to find parent button
+      if (!clicked) {
+        try {
+          const parentButton = page.locator('h3:has-text("使用WeCode云IDE") >> xpath=ancestor::button[1]')
+          if (await parentButton.isVisible({ timeout: 2000 })) {
+            await parentButton.click()
+            console.log('✓ Clicked: 使用WeCode云IDE (parent button)')
+            clicked = true
+          }
+        } catch {
+          // Continue to next strategy
+        }
+      }
+
+      // Strategy 3: Use XPath to find nearest div with border/card styling
+      if (!clicked) {
+        try {
+          const cardDiv = page.locator('h3:has-text("使用WeCode云IDE") >> xpath=ancestor::div[contains(@class, "border") or contains(@class, "cursor-pointer")][1]')
+          if (await cardDiv.isVisible({ timeout: 2000 })) {
+            await cardDiv.click()
+            console.log('✓ Clicked: 使用WeCode云IDE (card div)')
+            clicked = true
+          }
+        } catch {
+          // Continue to next strategy
+        }
+      }
+
+      // Strategy 4: Click any element with the text
+      if (!clicked) {
+        try {
+          await page.getByText('使用WeCode云IDE').first().click({ timeout: 2000 })
+          console.log('✓ Clicked: 使用WeCode云IDE (getByText)')
+          clicked = true
+        } catch {
+          console.log('✗ Failed to click Cloud IDE option')
+        }
       }
     } else {
       // Fallback: try the first option (在IDE中使用WeCode)
-      const firstOption = page.locator('[data-testid="onboarding-ide-option"]').first()
-      if (await firstOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await firstOption.click()
+      try {
+        await page.getByText('在IDE中使用WeCode').first().click({ timeout: 2000 })
         console.log('✓ Clicked: 在IDE中使用WeCode')
+      } catch {
+        console.log('✗ Could not click any onboarding option')
       }
     }
 
