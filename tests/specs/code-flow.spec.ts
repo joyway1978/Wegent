@@ -68,12 +68,22 @@ async function setupCodePage(page: any) {
     const isCloudIdeVisible = await cloudIdeHeading.isVisible({ timeout: 3000 }).catch(() => false)
 
     if (isCloudIdeVisible) {
-      // Click on the heading's parent container (the card)
-      await cloudIdeHeading.click()
-      console.log('✓ Clicked: 使用WeCode云IDE')
+      // Click on the card using data-testid instead of the heading
+      // The card has the onClick handler, not the heading
+      const cloudIdeCard = page.locator('[data-testid="onboarding-cloud-ide-option"]').first()
+      const isCardVisible = await cloudIdeCard.isVisible({ timeout: 3000 }).catch(() => false)
+
+      if (isCardVisible) {
+        await cloudIdeCard.click()
+        console.log('✓ Clicked: 使用WeCode云IDE (card)')
+      } else {
+        // Fallback: try clicking the heading's parent element
+        await cloudIdeHeading.locator('..').click()
+        console.log('✓ Clicked: 使用WeCode云IDE (parent)')
+      }
     } else {
       // Fallback: try the first option (在IDE中使用WeCode)
-      const firstOption = page.locator('h3', { hasText: '在IDE中使用WeCode' }).first()
+      const firstOption = page.locator('[data-testid="onboarding-ide-option"]').first()
       if (await firstOption.isVisible({ timeout: 2000 }).catch(() => false)) {
         await firstOption.click()
         console.log('✓ Clicked: 在IDE中使用WeCode')
