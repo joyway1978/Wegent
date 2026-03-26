@@ -20,6 +20,29 @@ from chat_shell.compression.strategies import (
 from chat_shell.compression.token_counter import TokenCounter
 
 
+def _assert_tool_call_groups_intact(messages):
+    index = 0
+    while index < len(messages):
+        message = messages[index]
+
+        if message.get("role") == "tool":
+            raise AssertionError("Found orphan tool message")
+
+        if message.get("role") == "assistant" and message.get("tool_calls"):
+            expected_ids = {tool_call["id"] for tool_call in message["tool_calls"]}
+            actual_ids = set()
+            index += 1
+
+            while index < len(messages) and messages[index].get("role") == "tool":
+                actual_ids.add(messages[index].get("tool_call_id"))
+                index += 1
+
+            assert expected_ids.issubset(actual_ids)
+            continue
+
+        index += 1
+
+
 class TestTokenCounter:
     """Tests for TokenCounter class."""
 
@@ -534,9 +557,9 @@ class TestHistoryTruncationStrategy:
         # No system messages after the first one (truncation notice must not be system)
         for i, msg in enumerate(compressed):
             if i > 0:
-                assert msg["role"] != "system", (
-                    f"Found system message at index {i}: {msg['content'][:50]}"
-                )
+                assert (
+                    msg["role"] != "system"
+                ), f"Found system message at index {i}: {msg['content'][:50]}"
 
         # Verify user/assistant alternation in non-system messages
         non_system = [m for m in compressed if m["role"] != "system"]
@@ -547,9 +570,7 @@ class TestHistoryTruncationStrategy:
             )
 
         # Truncation notice should be present somewhere in the compressed messages
-        notice_found = any(
-            "SYSTEM NOTICE" in m.get("content", "") for m in compressed
-        )
+        notice_found = any("SYSTEM NOTICE" in m.get("content", "") for m in compressed)
         assert notice_found
 
     def test_truncation_notice_bridges_odd_removal_anthropic(self):
@@ -564,7 +585,10 @@ class TestHistoryTruncationStrategy:
         messages = [
             {"role": "system", "content": "System prompt."},
             {"role": "user", "content": "User 0"},
-            {"role": "assistant", "content": "Assistant 0 " * 50},  # large to trigger removal
+            {
+                "role": "assistant",
+                "content": "Assistant 0 " * 50,
+            },  # large to trigger removal
             {"role": "user", "content": "User 1 " * 50},
             {"role": "assistant", "content": "Assistant 1 " * 50},
             {"role": "user", "content": "User 2"},
@@ -620,6 +644,62 @@ class TestHistoryTruncationStrategy:
             )
             assert notice_found
 
+    def test_truncation_notice_merged_with_list_content_anthropic(self):
+        """Test notice merging when next message has list content (e.g., time blocks)."""
+        strategy = HistoryTruncationStrategy()
+        counter = TokenCounter(model_id="claude-3-5-sonnet")
+        config = CompressionConfig(first_messages_to_keep=1, last_messages_to_keep=1)
+
+        # Build a conversation where the kept middle/last message has list content
+        # (typical for user messages with datetime injection).
+        # first_messages keeps user_0, last_messages keeps user_2 (list content)
+        messages = [
+            {"role": "system", "content": "System prompt."},
+            {"role": "user", "content": "User 0"},
+            {"role": "assistant", "content": "Assistant 0 " * 80},
+            {"role": "user", "content": "User 1 " * 80},
+            {"role": "assistant", "content": "Assistant 1 " * 80},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "User 2"},
+                    {
+                        "type": "text",
+                        "text": "<system-reminder><CurrentTime>2026-03-20</CurrentTime></system-reminder>",
+                    },
+                ],
+            },
+        ]
+
+        compressed, details = strategy.compress(messages, counter, 300, config)
+
+        if details["messages_removed"] > 0:
+            # Verify no TypeError — content must remain a list
+            last_msg = compressed[-1]
+            assert isinstance(last_msg["content"], list)
+
+            # Verify alternation
+            non_system = [m for m in compressed if m["role"] != "system"]
+            for i in range(1, len(non_system)):
+                assert non_system[i]["role"] != non_system[i - 1]["role"]
+
+            # Truncation notice should be present somewhere
+            def _contains_notice(content):
+                if isinstance(content, str):
+                    return "SYSTEM NOTICE" in content
+                if isinstance(content, list):
+                    return any(
+                        "SYSTEM NOTICE" in b.get("text", "")
+                        for b in content
+                        if isinstance(b, dict)
+                    )
+                return False
+
+            notice_found = any(
+                _contains_notice(m.get("content", "")) for m in compressed
+            )
+            assert notice_found
+
     def test_truncation_notice_uses_system_role_for_openai(self):
         """Test that OpenAI models keep original role='system' for truncation notice."""
         strategy = HistoryTruncationStrategy()
@@ -654,8 +734,9 @@ class TestHistoryTruncationStrategy:
         ]
         assert len(truncation_notices) == 1
 
-        # OpenAI should keep role="system" (original behavior)
-        assert truncation_notices[0]["role"] == "system"
+        # Non-Anthropic should also use alternation-safe roles (not system)
+        # to avoid issues when provider detection is inaccurate
+        assert truncation_notices[0]["role"] in ("user", "assistant")
 
     def test_no_truncation_for_short_history(self):
         """Test that short history is not truncated."""
@@ -675,6 +756,102 @@ class TestHistoryTruncationStrategy:
         # Should not change
         assert len(compressed) == len(messages)
         assert details["messages_removed"] == 0
+
+    def test_preserves_tool_call_group_when_first_boundary_hits_tool_result(self):
+        """Test first boundary adjustment keeps assistant tool call with its result."""
+        strategy = HistoryTruncationStrategy()
+        counter = TokenCounter(model_id="gpt-4")
+        config = CompressionConfig(first_messages_to_keep=2, last_messages_to_keep=2)
+
+        messages = [
+            {"role": "system", "content": "System prompt."},
+            {"role": "user", "content": "User 0"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "search", "arguments": "{}"},
+                    }
+                ],
+            },
+            {"role": "tool", "content": "Tool 1 output", "tool_call_id": "call_1"},
+            {"role": "assistant", "content": "Assistant middle " * 80},
+            {"role": "user", "content": "User 1"},
+            {"role": "assistant", "content": "Assistant 1"},
+        ]
+
+        compressed, details = strategy.compress(messages, counter, 200, config)
+
+        assert details["messages_removed"] > 0
+        assert any(msg.get("tool_calls") for msg in compressed)
+        _assert_tool_call_groups_intact(compressed)
+
+    def test_preserves_tool_call_group_when_last_boundary_hits_tool_result(self):
+        """Test last boundary adjustment keeps assistant tool call with its result."""
+        strategy = HistoryTruncationStrategy()
+        counter = TokenCounter(model_id="gpt-4")
+        config = CompressionConfig(first_messages_to_keep=1, last_messages_to_keep=2)
+
+        messages = [
+            {"role": "system", "content": "System prompt."},
+            {"role": "user", "content": "User 0"},
+            {"role": "assistant", "content": "Assistant 0 " * 80},
+            {"role": "user", "content": "User 1 " * 80},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_2",
+                        "type": "function",
+                        "function": {"name": "read_file", "arguments": "{}"},
+                    }
+                ],
+            },
+            {"role": "tool", "content": "Tool 2 output", "tool_call_id": "call_2"},
+            {"role": "assistant", "content": "Assistant 2"},
+        ]
+
+        compressed, details = strategy.compress(messages, counter, 300, config)
+
+        assert details["messages_removed"] > 0
+        assert any(msg.get("tool_calls") for msg in compressed)
+        _assert_tool_call_groups_intact(compressed)
+
+    def test_removes_tool_call_group_together_when_middle_removal_starts_with_tool_result(
+        self,
+    ):
+        """Test middle removal drops assistant tool call and tool result together."""
+        strategy = HistoryTruncationStrategy()
+        counter = TokenCounter(model_id="gpt-4")
+        config = CompressionConfig(first_messages_to_keep=1, last_messages_to_keep=1)
+
+        messages = [
+            {"role": "system", "content": "System prompt."},
+            {"role": "user", "content": "User 0"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_3",
+                        "type": "function",
+                        "function": {"name": "search", "arguments": "{}"},
+                    }
+                ],
+            },
+            {"role": "tool", "content": "Tool 3 output", "tool_call_id": "call_3"},
+            {"role": "user", "content": "User 1"},
+        ]
+
+        compressed, details = strategy.compress(messages, counter, 1, config)
+
+        assert details["messages_removed"] == 2
+        assert not any(msg.get("tool_calls") for msg in compressed)
+        assert not any(msg.get("role") == "tool" for msg in compressed)
 
 
 class TestMessageCompressor:
@@ -793,3 +970,49 @@ class TestMessageCompressor:
         # Should not compress
         assert not result.was_compressed
         assert result.messages == messages
+
+    def test_force_compression_keeps_essential_tool_call_group_intact(self):
+        """Test forced compression keeps assistant tool call and tool result together."""
+        compressor = MessageCompressor(model_id="gpt-4")
+
+        messages = [
+            {"role": "system", "content": "System prompt " * 400},
+            {"role": "user", "content": "User 0 " * 150},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_4",
+                        "type": "function",
+                        "function": {"name": "search", "arguments": "{}"},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "content": "Tool 4 output " * 200,
+                "tool_call_id": "call_4",
+            },
+            {"role": "user", "content": "User 1 " * 150},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_5",
+                        "type": "function",
+                        "function": {"name": "read_file", "arguments": "{}"},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "content": "Tool 5 output " * 200,
+                "tool_call_id": "call_5",
+            },
+        ]
+
+        compressed, _ = compressor._force_compression_to_target(messages, 10)
+
+        _assert_tool_call_groups_intact(compressed)

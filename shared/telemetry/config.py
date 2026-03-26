@@ -23,6 +23,8 @@ Environment Variables:
     OTEL_EXCLUDED_URLS: Comma-separated list of URL patterns to exclude from tracing (default: health,metrics,docs)
     OTEL_INCLUDED_URLS: Comma-separated list of URL patterns to include (whitelist mode, empty means all)
     OTEL_DISABLE_SEND_RECEIVE_SPANS: Disable internal http.send/http.receive spans for SSE/streaming (default: true)
+    OTEL_REDIS_FILTER_MODE: Redis span filtering mode - "all", "errors", "slow", "websocket" (default: websocket)
+    OTEL_REDIS_SLOW_THRESHOLD_MS: Slow Redis query threshold in milliseconds (default: 100)
         This is the industry standard approach to reduce noise from streaming endpoints like /api/chat/stream
         where each chunk would otherwise create a separate span. See OpenTelemetry ASGI instrumentation docs.
 """
@@ -339,33 +341,37 @@ def _url_matches_pattern(url: str, pattern: str) -> bool:
 
 def get_excluded_urls_regex() -> str:
     """
-    Get excluded URLs as a regex pattern string for FastAPI instrumentation.
+    Get excluded URLs as a comma-separated string for FastAPI instrumentation.
 
     This is useful for passing to FastAPIInstrumentor's excluded_urls parameter.
 
+    Note: FastAPIInstrumentor expects a comma-separated string of regex patterns,
+    not a single combined regex. Each pattern is matched independently using re.search().
+
     Returns:
-        str: Regex pattern string that matches all excluded URLs
+        str: Comma-separated regex patterns for excluded URLs
 
     Example:
         >>> get_excluded_urls_regex()
-        '/health|/healthz|/ready|/metrics|/api/docs|/api/openapi.json|/favicon.ico'
+        '^/$,^/health$,^/healthz$,^/ready$,^/metrics$,^/api/docs$,^/api/openapi\\.json$,/api/quota/.*,^/favicon\\.ico$'
     """
     config = get_otel_config()
     if not config.excluded_urls:
         return ""
 
-    # Convert patterns to regex
-    regex_parts = []
+    # Convert patterns to regex format suitable for FastAPIInstrumentor
+    # FastAPIInstrumentor expects comma-separated patterns, not | separated
+    regex_patterns = []
     for pattern in config.excluded_urls:
-        if pattern.startswith("^"):
-            # Already a regex, use as-is (remove the ^ as we'll join with |)
-            regex_parts.append(pattern[1:] if pattern.startswith("^") else pattern)
+        if pattern.startswith("^") or pattern.endswith("$"):
+            # Already a regex pattern (starts with ^ or ends with $), use as-is
+            regex_patterns.append(pattern)
         elif pattern.endswith("*"):
             # Wildcard pattern: /api/* -> /api/.*
-            prefix = re.escape(pattern[:-1])
-            regex_parts.append(f"{prefix}.*")
+            regex_patterns.append(f"{pattern[:-1]}.*")
         else:
-            # Exact match: escape special chars and add anchors
-            regex_parts.append(f"^{re.escape(pattern)}$")
+            # Exact match: add ^ and $ anchors for exact path matching
+            # This ensures /health only matches /health, not /healthcheck
+            regex_patterns.append(f"^{pattern}$")
 
-    return "|".join(regex_parts)
+    return ",".join(regex_patterns)

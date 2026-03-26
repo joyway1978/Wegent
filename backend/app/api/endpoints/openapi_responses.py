@@ -46,6 +46,7 @@ from app.services.openapi.helpers import (
     wegent_status_to_openai_status,
 )
 from app.services.readers.kinds import KindType, kindReader
+from app.utils.prompt_utils import extract_display_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,9 @@ def _task_to_response_object(
                 msg = OutputMessage(
                     id=f"msg_{subtask.id}",
                     status=subtask_status_to_message_status(subtask.status.value),
-                    content=[OutputTextContent(text=subtask.prompt)],
+                    content=[
+                        OutputTextContent(text=extract_display_prompt(subtask.prompt))
+                    ],
                     role="user",
                 )
                 output.append(msg)
@@ -383,6 +386,9 @@ async def _create_non_streaming_response_unified(
     preload_skills = tool_settings.get("preload_skills", [])
     user_id = user.id
 
+    # Extract knowledge base names from tool settings
+    knowledge_base_names = tool_settings.get("knowledge_base_names", [])
+
     # Build execution request
     try:
         execution_request = await build_execution_request(
@@ -395,6 +401,7 @@ async def _create_non_streaming_response_unified(
             enable_deep_thinking=enable_chat_bot,
             enable_web_search=enable_chat_bot and settings.WEB_SEARCH_ENABLED,
             preload_skills=preload_skills,
+            knowledge_base_names=knowledge_base_names,
         )
     except Exception as e:
         logger.error(f"Failed to build execution request: {e}")
@@ -494,7 +501,11 @@ async def _create_non_streaming_response_unified(
                     OutputMessage(
                         id=f"msg_{subtask.id}",
                         status="completed",
-                        content=[OutputTextContent(text=subtask.prompt)],
+                        content=[
+                            OutputTextContent(
+                                text=extract_display_prompt(subtask.prompt)
+                            )
+                        ],
                         role="user",
                     )
                 )
@@ -657,6 +668,9 @@ async def _create_streaming_response_unified(
     user_id = user.id
     user_name = user.user_name
 
+    # Extract knowledge base names from tool settings
+    knowledge_base_names = tool_settings.get("knowledge_base_names", [])
+
     # Build execution request using unified builder
     try:
         execution_request = await build_execution_request(
@@ -669,6 +683,7 @@ async def _create_streaming_response_unified(
             enable_deep_thinking=enable_chat_bot,
             enable_web_search=enable_chat_bot and settings.WEB_SEARCH_ENABLED,
             preload_skills=preload_skills,
+            knowledge_base_names=knowledge_base_names,
         )
     finally:
         # Close the database session before streaming starts
